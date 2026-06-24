@@ -1,0 +1,25 @@
+# logtut — Proje Dosya Envanteri
+
+logtut/
+├── app.py
+├── config.py
+├── requirements.txt
+├── README.md
+├── PROJECT_FILES.txt
+├── src/
+│   ├── database.py
+│   ├── log_processor.py
+│   ├── ai_engine.py
+│   ├── alert_engine.py
+│   ├── pipeline.py
+│   ├── reporter.py
+│   └── logging_config.py
+├── scripts/
+│   ├── apply_schema.py
+│   ├── run_pipeline.py
+│   ├── health_check.py
+│   └── set_cursor_key.py
+├── supabase/migrations/ (001-004)
+├── lab/poc_lab_simulator.py
+├── data/logs/
+└── data/reports/

@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/logs/*.log
+data/reports/*.md
+data/reports/*.json
+
+# .env ve runtime çıktıları hariç; klasör yapısı korunur
+!data/logs/.gitkeep
+!data/reports/.gitkeep
+!rules/.gitkeep
+!lab/.gitkeep
