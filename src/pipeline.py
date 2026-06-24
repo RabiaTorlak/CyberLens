@@ -60,7 +60,7 @@ class Pipeline:
                 logger.exception("Analysis failed for log %s", log_id)
                 continue
 
-            if saved:
+            if saved and saved.get("status") == "created":
                 result.rules_created += 1
                 result.rules.append(saved["rule"])
                 if saved.get("alert"):

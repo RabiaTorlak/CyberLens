@@ -251,16 +251,16 @@ def inject_cyber_theme() -> None:
 def render_header(analysis_mode: str) -> None:
     import streamlit as st
 
-    mode_label = "CURSOR LLM" if analysis_mode == "cursor" else "HEURISTIC AI"
+    mode_label = "Yapay Zeka" if analysis_mode == "cursor" else "Otomatik Analiz"
     st.markdown(
         f"""
         <div class="cyber-header">
-            <span class="cyber-badge cyber-badge-live">● LIVE SOC</span>
-            <span class="cyber-badge cyber-badge-secure">DETECTION ENGINE</span>
-            <h1>⚡ LOGTUT // THREAT OPERATIONS CENTER</h1>
+            <span class="cyber-badge cyber-badge-live">● CANLI İZLEME</span>
+            <span class="cyber-badge cyber-badge-secure">TEHDİT TESPİT</span>
+            <h1>⚡ LOGTUT — GÜVENLİK İZLEME MERKEZİ</h1>
             <p>
                 <span class="cyber-status-dot"></span>
-                Supabase Realtime Monitoring · Cloud-Native Security · Mode: {mode_label}
+                Anlık alarm takibi · Bulut veritabanı · Mod: {mode_label}
             </p>
         </div>
         """,
@@ -273,7 +273,11 @@ def render_alert_card(alert: dict, severity_colors: dict[str, str]) -> None:
 
     severity = str(alert.get("severity", "medium")).lower()
     color = severity_colors.get(severity, "#64748b")
-    title = alert.get("title", "Untitled Alert")
+    severity_tr = {"critical": "Kritik", "high": "Yüksek", "medium": "Orta", "low": "Düşük"}.get(severity, severity)
+    status_tr = {"open": "Açık", "investigating": "İnceleniyor", "resolved": "Çözüldü", "false_positive": "Yanlış alarm"}.get(
+        str(alert.get("status", "open")), alert.get("status", "open")
+    )
+    title = alert.get("title", "Başlıksız alarm")
     description = alert.get("description") or "—"
     status = alert.get("status", "open")
     created = alert.get("created_at", "")
@@ -282,9 +286,9 @@ def render_alert_card(alert: dict, severity_colors: dict[str, str]) -> None:
         f"""
         <div class="cyber-alert" style="border-left-color: {color};">
             <span class="cyber-badge" style="color:{color}; border:1px solid {color}; background:rgba(0,0,0,0.3);">
-                {severity}
+                {severity_tr}
             </span>
-            <span style="color:#64748b; font-size:0.75rem; margin-left:0.3rem;">{status}</span>
+            <span style="color:#64748b; font-size:0.75rem; margin-left:0.3rem;">{status_tr}</span>
             <div class="cyber-alert-title">{title}</div>
             <div class="cyber-alert-desc">{description}</div>
             <div class="cyber-alert-meta">{created}</div>

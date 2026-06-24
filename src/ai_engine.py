@@ -12,7 +12,16 @@ from typing import Any
 import config
 from cursor_sdk import Agent, AgentOptions, CursorAgentError, LocalAgentOptions
 
-from src.database import get_log_by_id, get_logs, get_unprocessed_logs, insert_rule, mark_log_analyzed, rule_exists_for_log
+from src.database import (
+    get_alert_by_log_id,
+    get_log_by_id,
+    get_logs,
+    get_rule_for_log,
+    get_unprocessed_logs,
+    insert_rule,
+    mark_log_analyzed,
+    rule_exists_for_log,
+)
 from src.alert_engine import create_alert_for_rule
 from src.logging_config import get_logger
 
@@ -266,6 +275,9 @@ def analyze_log_heuristic(log: dict[str, Any]) -> ThreatAnalysis:
     return analysis
 
 
+_llm_disabled: bool = False
+
+
 def analyze_log(
     log: dict[str, Any],
     *,
@@ -273,13 +285,15 @@ def analyze_log(
     model: str | None = None,
     mode: str | None = None,
 ) -> ThreatAnalysis:
+    global _llm_disabled
     selected_mode = mode or resolve_analysis_mode()
-    if selected_mode == "heuristic":
+    if selected_mode == "heuristic" or _llm_disabled:
         return analyze_log_heuristic(log)
 
     try:
         return analyze_log_with_llm(log, api_key=api_key, model=model)
     except (RuntimeError, CursorAgentError, OSError) as exc:
+        _llm_disabled = True
         logger.warning("Cursor LLM unavailable (%s); using heuristic fallback", exc)
         return analyze_log_heuristic(log)
 
@@ -395,14 +409,20 @@ class AIEngine:
         if resolved_log_id and rule_exists_for_log(resolved_log_id):
             logger.info("Rule already exists for log %s; skipping", resolved_log_id)
             mark_log_analyzed(resolved_log_id)
-            return None
+            existing_rule = get_rule_for_log(resolved_log_id)
+            existing_alert = get_alert_by_log_id(resolved_log_id) if existing_rule else None
+            return {
+                "status": "already_exists",
+                "rule": existing_rule,
+                "alert": existing_alert,
+            }
 
         analysis = self.analyze(log)
         if analysis is None:
             logger.info("No threat detected; skipping rule creation")
             if resolved_log_id:
                 mark_log_analyzed(resolved_log_id)
-            return None
+            return {"status": "no_threat", "rule": None, "alert": None}
 
         payload = build_rule_payload(analysis, resolved_log_id or None)
         rule = insert_rule(payload)
@@ -419,7 +439,7 @@ class AIEngine:
         if resolved_log_id:
             mark_log_analyzed(resolved_log_id)
 
-        return {"rule": rule, "alert": alert}
+        return {"status": "created", "rule": rule, "alert": alert}
 
     def analyze_log_by_id(self, log_id: str) -> dict[str, Any] | None:
         log = get_log_by_id(log_id)
@@ -432,7 +452,7 @@ class AIEngine:
         saved: list[dict[str, Any]] = []
         for log in get_unprocessed_logs(limit=limit):
             result = self.analyze_and_save(log, log.get("id"))
-            if result:
+            if result and result.get("status") == "created":
                 saved.append(result)
         return saved
 
@@ -451,6 +471,15 @@ def main() -> None:
         sys.exit(1)
 
     if rule is None:
+        print("No threat detected; rule not created.")
+        return
+
+    if rule.get("status") == "already_exists":
+        rule_data = rule.get("rule") or {}
+        print(f"Rule already exists: {rule_data.get('name', '—')} ({rule_data.get('id', '—')})")
+        return
+
+    if rule.get("status") == "no_threat":
         print("No threat detected; rule not created.")
         return
 

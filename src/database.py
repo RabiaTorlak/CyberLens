@@ -229,6 +229,23 @@ def rule_exists_for_log(log_id: str) -> bool:
         raise
 
 
+def get_rule_for_log(log_id: str) -> dict[str, Any] | None:
+    try:
+        response = (
+            get_client()
+            .table("rules")
+            .select("*")
+            .eq("metadata->>source_log_id", log_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+    except APIError:
+        logger.exception("Failed to fetch rule for log: %s", log_id)
+        raise
+
+
 # --- Logs ---
 
 
