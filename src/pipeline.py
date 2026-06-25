@@ -22,6 +22,7 @@ class PipelineResult:
     logs_analyzed: int = 0
     rules_created: int = 0
     alerts_created: int = 0
+    soar_responses: int = 0
     rules: list[dict[str, Any]] = field(default_factory=list)
     alerts: list[dict[str, Any]] = field(default_factory=list)
     report_path: str | None = None
@@ -66,6 +67,10 @@ class Pipeline:
                 if saved.get("alert"):
                     result.alerts_created += 1
                     result.alerts.append(saved["alert"])
+                    alert = saved["alert"]
+                    metadata = alert.get("metadata") or {}
+                    if isinstance(metadata, dict) and (metadata.get("soar") or {}).get("auto_response"):
+                        result.soar_responses += 1
 
         return result
 
@@ -94,6 +99,7 @@ class Pipeline:
             result.logs_analyzed = analysis.logs_analyzed
             result.rules_created = analysis.rules_created
             result.alerts_created = analysis.alerts_created
+            result.soar_responses = analysis.soar_responses
             result.rules = analysis.rules
             result.alerts = analysis.alerts
 

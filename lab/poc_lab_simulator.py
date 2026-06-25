@@ -25,6 +25,44 @@ from src.pipeline import Pipeline  # noqa: E402
 HOSTS = ["LAB-WS01", "LAB-WS02", "LAB-DC01", "LAB-SRV03", "LAB-FILE01", "LAB-WEB01"]
 USERS = ["admin", "SYSTEM", "svc_backup", "jdoe", "helpdesk", "guest"]
 
+# Random IP Generator için adres blokları.
+# "malicious" blokları threat_intel.MALICIOUS_IP_PREFIXES ile eşleşir → KRİTİK çıkar.
+MALICIOUS_IP_PREFIXES = [
+    "185.220.101",
+    "185.220.100",
+    "45.155.205",
+    "194.165.16",
+    "193.106.191",
+    "91.219.236",
+]
+# Genel/zararsız görünen public bloklar
+BENIGN_IP_PREFIXES = [
+    "8.8.8",
+    "20.190.160",
+    "52.96.40",
+    "151.101.0",
+    "104.18.32",
+    "172.217.16",
+]
+# İç ağ (kaynak IP olarak kullanılır)
+INTERNAL_IP_PREFIXES = ["10.0.0", "192.168.1", "172.16.5"]
+
+
+def random_ip(kind: str = "any") -> str:
+    """
+    Rastgele IP üret.
+    kind: 'malicious' | 'benign' | 'internal' | 'any'
+    """
+    if kind == "malicious":
+        prefix = random.choice(MALICIOUS_IP_PREFIXES)
+    elif kind == "benign":
+        prefix = random.choice(BENIGN_IP_PREFIXES)
+    elif kind == "internal":
+        prefix = random.choice(INTERNAL_IP_PREFIXES)
+    else:
+        prefix = random.choice(MALICIOUS_IP_PREFIXES + BENIGN_IP_PREFIXES)
+    return f"{prefix}.{random.randint(1, 254)}"
+
 # Geniş saldırı senaryo havuzu — her gönderimde rastgele seçilir.
 EVENT_CATALOG: list[dict[str, Any]] = [
     {
@@ -110,18 +148,37 @@ EVENT_CATALOG: list[dict[str, Any]] = [
 ]
 
 
+# Dış ağa çıkış yapan (hedef IP atanacak) olay türleri
+_EGRESS_EVENTS = {
+    "data_exfiltration",
+    "command_and_control",
+    "malware_download",
+    "lateral_movement",
+    "reconnaissance",
+}
+
+
 def _build_event(template: dict[str, Any]) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
+    event_type = template["event"]
+    data = {
+        **template["data"],
+        "simulation_id": str(uuid.uuid4())[:8],
+        "src_ip": random_ip("internal"),
+    }
+
+    # Ağ olaylarına rastgele dış hedef IP ata (çoğunlukla zararlı blok)
+    if event_type in _EGRESS_EVENTS:
+        kind = "malicious" if random.random() < 0.65 else "benign"
+        data["destination"] = random_ip(kind)
+
     return {
         "source": "poc-lab",
-        "event": template["event"],
+        "event": event_type,
         "host": random.choice(HOSTS),
         "user": random.choice(USERS),
         "timestamp": now,
-        "data": {
-            **template["data"],
-            "simulation_id": str(uuid.uuid4())[:8],
-        },
+        "data": data,
     }
 
 

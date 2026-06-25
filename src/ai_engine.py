@@ -24,6 +24,7 @@ from src.database import (
 )
 from src.alert_engine import create_alert_for_rule
 from src.logging_config import get_logger
+from src.response_engine import apply_soar_if_enabled
 
 logger = get_logger("ai_engine")
 
@@ -435,6 +436,9 @@ class AIEngine:
             resolved_log_id or None,
             analysis_engine=str(raw_engine),
         )
+
+        if alert:
+            alert = apply_soar_if_enabled(alert, log, rule)
 
         if resolved_log_id:
             mark_log_analyzed(resolved_log_id)

@@ -38,6 +38,9 @@ modules = [
     "src.ai_engine",
     "src.reporter",
     "src.logging_config",
+    "src.response_engine",
+    "src.threat_intel",
+    "src.forensic_engine",
     "app",
 ]
 for mod in modules:
@@ -90,9 +93,54 @@ try:
 except Exception as exc:
     results.append(check("rules.standard column", False, str(exc)))
 
+try:
+    from src.database import get_client, get_global_policy, set_global_policy
+
+    get_client()
+    default_policy = get_global_policy()
+    set_global_policy(default_policy)
+    results.append(check("platform_settings / global_policy", True, f"soar={default_policy}"))
+except Exception as exc:
+    results.append(check("platform_settings / global_policy", False, str(exc)))
+
+try:
+    from src.response_engine import execute_response, select_playbook
+
+    playbook = select_playbook({"event_type": "lateral_movement"})
+    results.append(check("response_engine playbook", "block_ip" in playbook))
+except Exception as exc:
+    results.append(check("response_engine playbook", False, str(exc)))
+
+try:
+    from src.threat_intel import check_ip
+
+    verdict = check_ip("185.220.101.45").get("verdict")
+    results.append(check("threat_intel IoC lookup", verdict == "malicious", f"verdict={verdict}"))
+except Exception as exc:
+    results.append(check("threat_intel IoC lookup", False, str(exc)))
+
+try:
+    from src.threat_intel import get_threat_score
+
+    ti = get_threat_score("185.220.101.45")
+    ok = ti["is_critical"] and 1 <= ti["weighted_score_1_10"] <= 10 and len(ti["sources"]) == 3
+    results.append(
+        check("threat_intel weighted score", ok, f"score={ti['weighted_score_1_10']}/10")
+    )
+except Exception as exc:
+    results.append(check("threat_intel weighted score", False, str(exc)))
+
+try:
+    from lab.poc_lab_simulator import random_ip
+
+    mal_ip = random_ip("malicious")
+    results.append(check("poc-lab random IP generator", bool(random_ip("benign") and mal_ip)))
+except Exception as exc:
+    results.append(check("poc-lab random IP generator", False, str(exc)))
+
 # --- Migrations on disk ---
 migrations = sorted((ROOT / "supabase" / "migrations").glob("*.sql"))
-results.append(check("Migration files", len(migrations) >= 4, f"found={len(migrations)}"))
+results.append(check("Migration files", len(migrations) >= 5, f"found={len(migrations)}"))
 
 # --- Summary ---
 passed = sum(results)

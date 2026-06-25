@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import html as html_lib
+import re
+from typing import Any
+
 CYBER_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@500;700&display=swap');
@@ -268,7 +272,25 @@ def render_header(analysis_mode: str) -> None:
     )
 
 
-def render_alert_card(alert: dict, severity_colors: dict[str, str]) -> None:
+def _esc(text: Any) -> str:
+    return html_lib.escape(str(text if text is not None else ""))
+
+
+def _plain_field(text: Any) -> str:
+    """Kullanıcı metnini güvenli düz metne çevir (bozuk HTML parçalarını temizle)."""
+    raw = str(text if text is not None else "")
+    raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return _esc(raw or "—")
+
+
+def render_alert_card(
+    alert: dict,
+    severity_colors: dict[str, str],
+    *,
+    global_soar_active: bool = False,
+    intel: dict | None = None,
+) -> None:
     import streamlit as st
 
     severity = str(alert.get("severity", "medium")).lower()
@@ -277,25 +299,95 @@ def render_alert_card(alert: dict, severity_colors: dict[str, str]) -> None:
     status_tr = {"open": "Açık", "investigating": "İnceleniyor", "resolved": "Çözüldü", "false_positive": "Yanlış alarm"}.get(
         str(alert.get("status", "open")), alert.get("status", "open")
     )
-    title = alert.get("title", "Başlıksız alarm")
-    description = alert.get("description") or "—"
-    status = alert.get("status", "open")
-    created = alert.get("created_at", "")
+    title = _plain_field(alert.get("title", "Başlıksız alarm"))
+    raw_desc = str(alert.get("description") or "—")
+    raw_desc = re.sub(r"<[^>]+>", " ", raw_desc)
+    raw_desc = re.sub(r"[ \t]+", " ", raw_desc)
+    description = _esc(raw_desc.strip()).replace("\n", "<br>")
+    created = _esc(alert.get("created_at", ""))
 
-    st.markdown(
-        f"""
-        <div class="cyber-alert" style="border-left-color: {color};">
-            <span class="cyber-badge" style="color:{color}; border:1px solid {color}; background:rgba(0,0,0,0.3);">
-                {severity_tr}
-            </span>
-            <span style="color:#64748b; font-size:0.75rem; margin-left:0.3rem;">{status_tr}</span>
-            <div class="cyber-alert-title">{title}</div>
-            <div class="cyber-alert-desc">{description}</div>
-            <div class="cyber-alert-meta">{created}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    metadata = alert.get("metadata") or {}
+    soar = metadata.get("soar") if isinstance(metadata, dict) else None
+
+    soar_badge_html = ""
+    soar_detail_html = ""
+    if global_soar_active and soar and soar.get("auto_response"):
+        soar_badge_html = (
+            '<span class="cyber-badge" style="color:#ffb020; border:1px solid #ffb020; '
+            'background:rgba(255,176,32,0.12); margin-left:0.35rem;">⚡ OTOMATİK MÜDAHALE</span>'
+        )
+        details = soar.get("action_details") or [soar.get("action_summary", "Otomatik müdahale uygulandı")]
+        detail_lines = "<br>".join(f"▸ {_esc(line)}" for line in details[:4])
+        soar_detail_html = (
+            '<div style="margin-top:0.5rem; padding:0.5rem 0.65rem; border-radius:6px; '
+            'background:rgba(255,176,32,0.08); border:1px solid rgba(255,176,32,0.25); '
+            'font-size:0.78rem; color:#fbbf24;">'
+            f"<strong>Otomatik Müdahale Devrede</strong><br>{detail_lines}"
+            "</div>"
+        )
+    elif global_soar_active and not soar:
+        soar_detail_html = (
+            '<div style="margin-top:0.4rem; font-size:0.75rem; color:#64748b;">'
+            "SOAR modu aktif — bu alarm henüz otomatik işlenmedi."
+            "</div>"
+        )
+
+    # --- Threat Intelligence: risk skoru, istihbarat notu, zararlı çerçevesi ---
+    intel_badge_html = ""
+    intel_note_html = ""
+    card_extra_style = ""
+    if intel and intel.get("indicators"):
+        score = int(intel.get("risk_score", 0))
+        verdict = str(intel.get("verdict", "unknown"))
+        is_malicious = bool(intel.get("is_malicious"))
+        is_critical = bool(intel.get("is_critical"))
+        note = _esc(intel.get("note", ""))
+
+        if score >= 75 or is_critical:
+            ti_color = "#ff2d55"
+        elif score >= 30:
+            ti_color = "#ffb020"
+        elif verdict == "internal":
+            ti_color = "#3b82f6"
+        else:
+            ti_color = "#00ff88"
+
+        critical_badge = (
+            '<span class="cyber-badge" style="color:#fff;border:1px solid #ff2d55;'
+            'background:#ff2d55;margin-left:0.35rem;font-weight:700;">🚨 KRİTİK</span>'
+            if is_critical
+            else ""
+        )
+        intel_badge_html = (
+            critical_badge
+            + f'<span class="cyber-badge" style="color:{ti_color};border:1px solid {ti_color};'
+            f'background:rgba(0,0,0,0.3);margin-left:0.35rem;">🛰 Risk {score}/100</span>'
+        )
+        intel_note_html = (
+            f'<div style="margin-top:0.45rem;padding:0.4rem 0.6rem;border-radius:6px;'
+            f'background:rgba(0,0,0,0.25);border:1px solid {ti_color};'
+            f'font-size:0.74rem;color:{ti_color};">'
+            f"<strong>İstihbarat:</strong> {note}</div>"
+        )
+        if is_malicious or is_critical:
+            card_extra_style = (
+                "border:2px solid #ff2d55;box-shadow:0 0 14px rgba(255,45,85,0.45);"
+            )
+
+    parts = [
+        f'<div class="cyber-alert" style="border-left-color:{color};{card_extra_style}">',
+        f'<span class="cyber-badge" style="color:{color};border:1px solid {color};background:rgba(0,0,0,0.3);">{severity_tr}</span>',
+        f'<span style="color:#64748b;font-size:0.75rem;margin-left:0.3rem;">{status_tr}</span>',
+        soar_badge_html,
+        intel_badge_html,
+        f'<div class="cyber-alert-title">{title}</div>',
+        f'<div class="cyber-alert-desc">{description}</div>',
+        intel_note_html,
+        soar_detail_html,
+        f'<div class="cyber-alert-meta">{created}</div>',
+        "</div>",
+    ]
+    st.markdown("".join(parts), unsafe_allow_html=True)
 
 
 def panel_title(text: str) -> None:

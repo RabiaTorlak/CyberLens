@@ -328,6 +328,36 @@ def delete_log(log_id: str) -> None:
         raise
 
 
+def get_logs_by_actor(
+    hostname: str | None = None,
+    username: str | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Aynı host veya kullanıcıya ait tüm logları zaman sırasına göre döndür."""
+    or_clauses: list[str] = []
+    if hostname:
+        or_clauses.append(f"hostname.eq.{hostname}")
+    if username:
+        or_clauses.append(f"username.eq.{username}")
+
+    if not or_clauses:
+        return []
+
+    try:
+        query = get_client().table("logs").select("*")
+        query = query.or_(",".join(or_clauses))
+        response = (
+            query.order("event_time", desc=False)
+            .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return response.data
+    except APIError:
+        logger.exception("Failed to fetch logs by actor (host=%s user=%s)", hostname, username)
+        raise
+
+
 def get_unprocessed_logs(limit: int = 50) -> list[dict[str, Any]]:
     try:
         response = (
@@ -353,3 +383,55 @@ def mark_log_analyzed(log_id: str) -> None:
     except APIError:
         logger.exception("Failed to mark log analyzed: %s", log_id)
         raise
+
+
+# --- Platform settings (SOAR global policy) ---
+
+GLOBAL_POLICY_KEY = "global_policy"
+
+
+def get_global_policy() -> bool:
+    """Return True when SOAR auto-response is enabled."""
+    try:
+        response = (
+            get_client()
+            .table("platform_settings")
+            .select("value")
+            .eq("key", GLOBAL_POLICY_KEY)
+            .maybe_single()
+            .execute()
+        )
+        if not response.data:
+            return False
+        value = response.data.get("value") or {}
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, dict):
+            return bool(value.get("soar_enabled", value.get("enabled", False)))
+        return bool(value)
+    except APIError as exc:
+        if exc.code == "PGRST205" or "platform_settings" in str(exc):
+            logger.warning("platform_settings table missing; SOAR disabled until migration 005 applied")
+            return False
+        logger.exception("Failed to read global_policy")
+        raise
+
+
+def set_global_policy(enabled: bool) -> dict[str, Any]:
+    payload = {
+        "key": GLOBAL_POLICY_KEY,
+        "value": {"soar_enabled": enabled},
+    }
+    try:
+        response = (
+            get_client()
+            .table("platform_settings")
+            .upsert(payload, on_conflict="key")
+            .execute()
+        )
+        logger.info("global_policy soar_enabled=%s", enabled)
+        return response.data[0]
+    except APIError:
+        logger.exception("Failed to update global_policy")
+        raise
+
