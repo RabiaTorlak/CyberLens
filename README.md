@@ -1,92 +1,76 @@
-# logtut — Cloud-Native Detection Engineering Platform
+<div align="center">
 
-**logtut**, saldırı simülasyonu ortamlarından (`poc-lab`) gelen telemetriyi işleyen, LLM destekli tespit kuralları üreten ve **Supabase Realtime Monitoring** ile canlı alarm akışı sunan bir **Detection Engineering** platformudur. Mimari, **Cloud-Native Security** prensiplerine uygun olarak durumsuz (stateless) servis katmanları, yönetilen PostgreSQL backend ve olay güdümlü (event-driven) veri akışı üzerine kurulmuştur.
+# 🛡️ CyberLens
+
+### Bulut Tabanlı Tespit Mühendisliği & SOC Platformu
+
+*Saldırı simülasyonu → log toplama → yapay zeka analizi → otomatik müdahale → canlı izleme*
+
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.36+-FF4B4B?logo=streamlit&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
+![License](https://img.shields.io/badge/Lisans-E%C4%9Fitim%2FLab-blue)
+
+</div>
 
 ---
 
-## Mimari Genel Bakış
+## 📖 CyberLens Nedir?
+
+**CyberLens**, gerçek bir **SOC (Security Operations Center)** iş akışını taklit eden mini bir tespit mühendisliği laboratuvarıdır. Dışarıdan gelen güvenlik loglarını toplar, yapay zeka / sezgisel motorla analiz eder, tehditler için kural ve alarm üretir, çoklu kaynaktan tehdit istihbaratı toplar ve isteğe bağlı olarak **otomatik müdahale (SOAR)** uygular.
+
+> **Basitçe:** Sahte saldırı logları gönderirsin → sistem tehdidi yakalar → alarm üretir → panelde izlersin → istersen otomatik müdahale eder.
+
+---
+
+## ✨ Öne Çıkan Özellikler
+
+| Özellik | Açıklama |
+| --- | --- |
+| 🔍 **Tespit Motoru** | Cursor LLM + sezgisel yedek; loglardan KQL tespit kuralları üretir |
+| 🚨 **Otomatik Alarm** | Tehdit bulunan her log için otomatik alarm + NIST/OWASP/MITRE etiketi |
+| ⚡ **SOAR Otomatik Müdahale** | Global anahtarla; tehditte playbook çalıştırır (IP engelle, host izole, kullanıcı kapat) |
+| 🛰 **Çoklu Kaynak Tehdit İstihbaratı** | VirusTotal + AbuseIPDB + OTX → ağırlıklı risk skoru (1–10) + KRİTİK işaretleme |
+| 🕓 **Adli Zaman Çizelgesi** | Bir alarmın saldırganına ait tüm hareketleri kronolojik dizer |
+| 📊 **Canlı SOC Paneli** | Supabase Realtime ile anlık alarm akışı, açık/arşiv sekmeleri, grafikler |
+| 🧪 **Saldırı Lab (poc-lab)** | 20 senaryoluk havuzdan rastgele saldırı + rastgele IP üretici |
+| 📑 **Günlük Rapor** | Kritik alarmların executive summary çıktısı (MD/JSON) |
+
+---
+
+## 🏗️ Mimari
 
 ```
-poc-lab ──► log_processor ──► Supabase (logs)
-                                    │
-                                    ▼
-                              ai_engine (Cursor LLM)
-                                    │
-                                    ▼
-                              Supabase (rules)
-                                    │
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-            app.py (Realtime UI)              reporter.py
-         Supabase Realtime WS              Daily Critical Report
+┌──────────────────┐         ┌─────────────────────────────────────────────┐
+│  🧪 Saldırı Lab   │  log    │            🛡️ Güvenlik Paneli (SOC)           │
+│   (poc-lab)       │ ──────► │                                               │
+│ rastgele saldırı  │         │  log_processor → ai_engine → alert_engine     │
+│ + rastgele IP     │         │       │              │             │          │
+└──────────────────┘         │       ▼              ▼             ▼          │
+                             │   Supabase        threat_intel  response_engine│
+                             │   (logs/rules/    (VT+Abuse+OTX) (SOAR playbook)│
+                             │    alerts)            │             │          │
+                             │       │               ▼             ▼          │
+                             │       └──► Realtime UI ◄── forensic_engine      │
+                             └─────────────────────────────────────────────┘
 ```
 
 | Katman | Bileşen | Sorumluluk |
 | --- | --- | --- |
-| Ingestion | `src/log_processor.py` | Log temizleme, batch buffer (5s / 10 kayıt) |
-| Persistence | `src/database.py` | supabase-py CRUD — `logs`, `rules`, `alerts` |
-| Detection | `src/ai_engine.py` | Cursor SDK ile tehdit analizi + KQL üretimi |
-| Monitoring | `app.py` | Streamlit dashboard, **Supabase Realtime Monitoring** |
-| Reporting | `src/reporter.py` | Günlük kritik alarm özet raporu |
-| Orchestration | `src/pipeline.py` | Ingest → analyze → alert zinciri |
-| Alerting | `src/alert_engine.py` | Kural sonrası otomatik alarm oluşturma |
-| Observability | `src/logging_config.py` | Merkezi, rotasyonlu loglama |
+| Ingestion | `src/log_processor.py` | Log temizleme + batch buffer (5 sn / 10 kayıt) |
+| Persistence | `src/database.py` | Supabase CRUD — logs, rules, alerts, platform_settings |
+| Detection | `src/ai_engine.py` | LLM/sezgisel tehdit analizi + KQL üretimi |
+| Alerting | `src/alert_engine.py` | Kural sonrası otomatik alarm |
+| **SOAR** | `src/response_engine.py` | Otomatik playbook müdahalesi |
+| **Threat Intel** | `src/threat_intel.py` | Çoklu kaynak IoC skorlama + KRİTİK tespiti |
+| **Forensics** | `src/forensic_engine.py` | Saldırgan zaman çizelgesi rekonstrüksiyonu |
+| Orchestration | `src/pipeline.py` | Ingest → analyze → alert → report |
+| Reporting | `src/reporter.py` | Günlük kritik alarm raporu |
+| UI | `app.py`, `src/ui/` | Streamlit çok sayfalı dashboard |
 
 ---
 
-## Detection Engineering Yetenekleri
-
-Platform, modern **Detection Engineering** yaşam döngüsünün temel adımlarını otomatikleştirir:
-
-1. **Telemetri toplama** — poc-lab araçlarından gelen ham olaylar normalize edilir.
-2. **Kural geliştirme** — Cursor LLM, log bağlamından KQL detection sorguları üretir.
-3. **Framework eşlemesi** — NIST CSF, OWASP Top 10 ve MITRE ATT&CK referansları `rules.standard` alanına yazılır.
-4. **Operasyonel geri bildirim** — Alarmlar Realtime kanalı üzerinden SOC dashboard'una akar.
-5. **Raporlama** — Kritik alarmlar günlük executive summary formatında arşivlenir.
-
----
-
-## Cloud-Native Security Tasarımı
-
-- **Yönetilen veritabanı:** Supabase PostgreSQL — RLS, JSONB telemetri, publication tabanlı Realtime.
-- **Durumsuz uygulama katmanı:** Python modülleri horizontal scale için uygun; state Supabase'te tutulur.
-- **Olay güdümlü izleme:** `alerts` tablosundaki INSERT olayları WebSocket ile dashboard'a iletilir — klasik polling yerine push-tabanlı **Supabase Realtime Monitoring**.
-- **Batch ingestion:** Yüksek hacimli log akışında API throttling'i önlemek için buffer + toplu INSERT.
-- **Secrets yönetimi:** Tüm kimlik bilgileri `.env` üzerinden; repoya commit edilmez.
-
----
-
-## Proje Yapısı
-
-```
-logtut/
-├── app.py                          # Streamlit dashboard
-├── config.py                       # Ortam değişkenleri
-├── requirements.txt
-├── src/
-│   ├── database.py                 # Supabase veri erişim katmanı
-│   ├── log_processor.py            # Batch log ingestion + cleaning
-│   ├── ai_engine.py                # Cursor LLM tespit motoru
-│   ├── alert_engine.py             # Otomatik alarm oluşturma
-│   ├── pipeline.py                 # End-to-end orchestrator
-│   ├── reporter.py                 # Günlük kritik alarm raporu
-│   └── logging_config.py           # Merkezi logging
-├── supabase/migrations/            # PostgreSQL şema migration'ları
-├── scripts/
-│   ├── apply_schema.py
-│   ├── run_pipeline.py
-│   ├── health_check.py
-│   └── set_cursor_key.py
-├── data/
-│   ├── logs/                       # platform.log (rotating)
-│   └── reports/                    # Günlük rapor çıktıları
-├── rules/                          # Sigma/YARA kural dosyaları (lab)
-└── lab/                            # poc-lab simülasyon araçları
-```
-
----
-
-## Kurulum
+## 🚀 Hızlı Başlangıç
 
 ### 1. Bağımlılıklar
 
@@ -96,20 +80,21 @@ pip install -r requirements.txt
 
 ### 2. Ortam Değişkenleri
 
-`.env.example` dosyasını kopyalayın:
-
 ```bash
 cp .env.example .env
 ```
 
-| Değişken | Açıklama |
-| --- | --- |
-| `SUPABASE_URL` | Supabase proje URL |
-| `SUPABASE_KEY` | Publishable / anon key |
-| `CURSOR_API_KEY` | Cursor SDK API anahtarı |
-| `CURSOR_MODEL` | LLM model (varsayılan: `composer-2.5`) |
-| `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `SUPABASE_DB_PASSWORD` | Migration script için DB şifresi |
+| Değişken | Gerekli mi? | Açıklama |
+| --- | --- | --- |
+| `SUPABASE_URL` | ✅ | Supabase proje URL'si |
+| `SUPABASE_KEY` | ✅ | Publishable / anon anahtar |
+| `CURSOR_API_KEY` | ⭕ | Yapay zeka analizi için (yoksa sezgisel mod) |
+| `ABUSEIPDB_API_KEY` | ⭕ | Tehdit istihbaratı (yoksa offline demo) |
+| `VIRUSTOTAL_API_KEY` | ⭕ | Tehdit istihbaratı (yoksa offline demo) |
+| `OTX_API_KEY` | ⭕ | AlienVault OTX (yoksa offline demo) |
+| `SUPABASE_DB_PASSWORD` | ⭕ | Sadece migration script için |
+
+> Hiçbir opsiyonel anahtar olmadan da platform tamamen çalışır — sezgisel analiz ve offline tehdit istihbaratı devreye girer.
 
 ### 3. Veritabanı Şeması
 
@@ -117,167 +102,143 @@ cp .env.example .env
 python scripts/apply_schema.py
 ```
 
-Migration'lar sırasıyla uygulanır:
-
-- `001_initial_schema.sql` — `rules`, `logs`, `alerts` tabloları
-- `002_add_rules_standard.sql` — NIST/OWASP `standard` sütunu
-- `003_enable_realtime_alerts.sql` — Realtime publication
-
----
-
-## Kullanım
-
-### Log Ingestion (poc-lab)
-
-```python
-from src.log_processor import get_processor
-
-processor = get_processor()
-processor.process({
-    "source": "poc-lab",
-    "event": "lateral_movement",
-    "host": "TARGET-01",
-    "user": "SYSTEM",
-    "timestamp": "2026-06-21T14:30:00Z",
-    "data": {"technique": "T1021"},
-})
-processor.shutdown()  # kalan buffer'ı flush eder
-```
-
-### AI Tespit Motoru
-
-```python
-from src.ai_engine import AIEngine
-
-engine = AIEngine()
-rule = engine.analyze_log_by_id("<log-uuid>")
-```
-
-CLI:
+### 4. Sağlık Kontrolü
 
 ```bash
-python -m src.ai_engine <log_id>
+python scripts/health_check.py
 ```
 
-### Dashboard (Supabase Realtime Monitoring)
+### 5. Paneli Başlat
 
 ```bash
 streamlit run app.py
 ```
 
-Dashboard özellikleri:
+---
 
-- **Canlı alarmlar** — Supabase Realtime `INSERT` subscription
-- **Ağ trafiği grafiği** — Plotly bar chart (log dağılımı)
-- **KQL Kuralı Üret** — Seçili log için `AIEngine.analyze_and_save()` tetikler
+## 🎮 Kullanım
 
-### End-to-End Pipeline
+Panel iki sayfadan oluşur:
 
-Tek komutla tüm akışı çalıştırın (ingest → analyze → rule + alert):
+### 🛡️ Güvenlik Paneli
+- Canlı alarm akışı (açık / arşiv sekmeleri)
+- 🛰 Canlı tehdit istihbaratı özeti
+- 🕓 Adli zaman çizelgesi
+- Kural üretici (KQL + sade dil açıklama)
+- Sol panelde **⚡ SOAR otomatik müdahale** anahtarı
 
-```bash
-python scripts/run_pipeline.py --full
-```
+### 🧪 Saldırı Lab
+- Rastgele saldırı senaryosu üret (20 şablon)
+- Rastgele zararlı/zararsız IP blokları
+- "Logları sisteme gönder" + otomatik analiz
 
-Adım adım:
-
-```bash
-python lab/poc_lab_simulator.py --full
-python scripts/run_pipeline.py --analyze
-python scripts/run_pipeline.py --report
-```
-
-### Günlük Kritik Alarm Raporu
+### Tipik akış
 
 ```bash
+# 1) Test logları gönder + analiz et + alarm üret
+python lab/poc_lab_simulator.py --count 6 --full
+
+# 2) Paneli aç
+streamlit run app.py
+
+# 3) Günlük kritik alarm raporu
 python -m src.reporter
-python -m src.reporter 2026-06-21
-```
-
-Çıktılar: `data/reports/critical-alerts-YYYY-MM-DD.{md,json}`
-
----
-
-### `logs`
-
-| Sütun | Tip | Açıklama |
-| --- | --- | --- |
-| `source` | TEXT | Log kaynağı (ör. `poc-lab`) |
-| `event_type` | TEXT | Olay tipi |
-| `hostname` | TEXT | Hedef sistem |
-| `username` | TEXT | İlgili kullanıcı |
-| `raw_data` | JSONB | Ham/normalize edilmiş payload |
-| `event_time` | TIMESTAMPTZ | Olay zamanı |
-
-### `rules`
-
-| Sütun | Tip | Açıklama |
-| --- | --- | --- |
-| `name` | TEXT | Kural adı |
-| `content` | TEXT | KQL sorgusu |
-| `rule_type` | TEXT | `kql`, `sigma`, `custom` |
-| `severity` | TEXT | `low` \| `medium` \| `high` \| `critical` |
-| `standard` | TEXT | `NIST:DE.AE; OWASP:A01:2021; MITRE:T1059` |
-| `metadata` | JSONB | LLM analizi, kaynak log ID |
-
-### `alerts`
-
-| Sütun | Tip | Açıklama |
-| --- | --- | --- |
-| `title` | TEXT | Alarm başlığı |
-| `severity` | TEXT | Önem derecesi |
-| `status` | TEXT | `open` \| `investigating` \| `resolved` \| `false_positive` |
-| `rule_id` | UUID | İlişkili detection rule |
-| `matched_log_id` | UUID | Tetikleyen log |
-
----
-
-## Loglama ve Hata Yönetimi
-
-Merkezi logging `src/logging_config.py` üzerinden yapılandırılır:
-
-- **Console** — stderr, yapılandırılabilir seviye
-- **File** — `data/logs/platform.log` (5 MB rotasyon, 5 yedek)
-- **Logger namespace** — `logtut.database`, `logtut.ai_engine`, `logtut.reporter`, ...
-
-Tüm Supabase API çağrıları `postgrest.exceptions.APIError` yakalanır ve `logger.exception()` ile kaydedilir. Buffer flush hatalarında loglar kuyruğa geri yüklenir (data loss önleme).
-
-```python
-from src.logging_config import get_logger
-
-logger = get_logger("my_module")
-logger.info("Operation completed")
 ```
 
 ---
 
-## Supabase Realtime Monitoring
+## 🧠 Tespit Kuralları
 
-`alerts` tablosu `supabase_realtime` publication'a eklenmiştir. Dashboard, `postgres_changes` kanalı üzerinden yalnızca `INSERT` olaylarını dinler:
+Her log analiz edildiğinde:
 
-```python
-channel = client.channel("dashboard-alerts")
-channel.on_postgres_changes(
-    event="INSERT",
-    schema="public",
-    table="alerts",
-    callback=handler,
-).subscribe()
+1. **Tehdit tespiti** — LLM veya sezgisel motor logu inceler
+2. **KQL üretimi** — Microsoft Sentinel uyumlu tespit sorgusu
+3. **Framework eşlemesi** — `NIST:DE.AE; OWASP:A07:2021; MITRE:T1003`
+4. **Alarm** — önem derecesine göre SOC paneline düşer
+
+---
+
+## ⚡ SOAR — Otomatik Müdahale
+
+Sol paneldeki anahtar açıkken, tehdit tespit edilen alarmlar analist onayı beklemeden otomatik işlenir:
+
+| Olay türü | Otomatik aksiyonlar |
+| --- | --- |
+| Yanal hareket | IP engelle · host izole · SOC bildir |
+| Kimlik erişimi | kullanıcı devre dışı · parola sıfırla · host izole |
+| PowerShell | process karantina · host izole |
+| Veri sızdırma | IP engelle · host izole |
+
+> Aksiyonlar simülasyondur (gerçek firewall'a bağlı değil) — playbook mantığını gösterir.
+
+---
+
+## 🛰 Tehdit İstihbaratı (Threat Intelligence)
+
+`get_threat_score(ip)` fonksiyonu üç kaynağı sorgular ve **ağırlıklı risk skoru** üretir:
+
+| Kaynak | Ağırlık | Normalize |
+| --- | --- | --- |
+| VirusTotal | %45 | zararlı motor oranı → 1–10 |
+| AbuseIPDB | %35 | güven skoru → 1–10 |
+| AlienVault OTX | %20 | pulse sayısı → 1–10 |
+
+**KRİTİK** koşulu: VirusTotal `malicious` **veya** AbuseIPDB skoru ≥ %50 → alarm kartı kırmızı çerçeveye alınır.
+
+---
+
+## 📁 Proje Yapısı
+
+```
+CyberLens/
+├── app.py                       # Çok sayfalı Streamlit giriş noktası
+├── config.py                    # Ortam değişkenleri
+├── requirements.txt
+├── src/
+│   ├── database.py              # Supabase veri erişimi
+│   ├── log_processor.py         # Batch log ingestion + temizleme
+│   ├── ai_engine.py             # LLM/sezgisel tespit motoru
+│   ├── alert_engine.py          # Otomatik alarm
+│   ├── response_engine.py       # SOAR otomatik müdahale
+│   ├── threat_intel.py          # Çoklu kaynak tehdit istihbaratı
+│   ├── forensic_engine.py       # Adli zaman çizelgesi
+│   ├── pipeline.py              # End-to-end orchestrator
+│   ├── reporter.py              # Günlük kritik alarm raporu
+│   ├── logging_config.py        # Merkezi loglama
+│   └── ui/
+│       ├── soc_page.py          # Güvenlik paneli
+│       ├── lab_page.py          # Saldırı lab sayfası
+│       ├── dashboard_common.py  # Paylaşılan UI bileşenleri
+│       ├── cyber_theme.py       # Siber tema + alarm kartları
+│       └── rule_explainer.py    # Kural açıklamaları
+├── supabase/migrations/         # PostgreSQL şema migration'ları
+├── scripts/                     # apply_schema, run_pipeline, health_check
+├── lab/poc_lab_simulator.py     # poc-lab + rastgele IP üretici
+└── data/                        # logs/ + reports/
 ```
 
-Bu yaklaşım, **Cloud-Native Security** operasyonlarında düşük gecikmeli (low-latency) alarm triage sağlar; polling tabanlı çözümlere kıyasla API yükünü ve algılama gecikmesini azaltır.
+---
+
+## 🗄️ Veri Modeli
+
+**logs** → ham/normalize olaylar · **rules** → tespit kuralları (KQL + standard) · **alerts** → alarmlar (status, severity, metadata) · **platform_settings** → global SOAR anahtarı
 
 ---
 
-## Geliştirme Notları
+## 🔒 Güvenlik Notları
 
-- Buffer eşikleri: `BATCH_INTERVAL_SECONDS=5`, `BATCH_SIZE_THRESHOLD=10` (`log_processor.py`)
-- Realtime panel yenileme: 2 saniye (`app.py` `@st.fragment`)
-- Raporlama penceresi: UTC gün sınırları (`reporter.py`)
-- IPv6 olmayan ağlarda migration script otomatik pooler keşfi yapar (`apply_schema.py`)
+- Tüm kimlik bilgileri `.env` üzerinden yönetilir, repoya **commit edilmez**.
+- Supabase tablolarında Row Level Security (RLS) etkindir.
+- Bu platform **eğitim ve laboratuvar** amaçlıdır; üretim ortamı için sertleştirme gerekir.
 
 ---
 
-## Lisans
+## 📜 Lisans
 
-Bu proje eğitim ve Detection Engineering laboratuvar kullanımı için geliştirilmiştir.
+Eğitim ve tespit mühendisliği laboratuvar kullanımı için geliştirilmiştir.
+
+<div align="center">
+
+**CyberLens** · Detection Engineering Lab 🛡️
+
+</div>
