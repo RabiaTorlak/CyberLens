@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -104,7 +103,7 @@ except Exception as exc:
     results.append(check("platform_settings / global_policy", False, str(exc)))
 
 try:
-    from src.response_engine import execute_response, select_playbook
+    from src.response_engine import select_playbook
 
     playbook = select_playbook({"event_type": "lateral_movement"})
     results.append(check("response_engine playbook", "block_ip" in playbook))

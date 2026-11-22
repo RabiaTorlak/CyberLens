@@ -1,13 +1,20 @@
+# Gizli bilgiler
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-data/logs/*.log
+.pytest_cache/
+.ruff_cache/
+
+# Çalışma zamanı çıktıları (klasör yapısı .gitkeep ile korunur)
+data/logs/*.log*
 data/reports/*.md
 data/reports/*.json
-
-# .env ve runtime çıktıları hariç; klasör yapısı korunur
 !data/logs/.gitkeep
 !data/reports/.gitkeep
 !rules/.gitkeep

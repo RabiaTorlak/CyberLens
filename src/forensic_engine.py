@@ -174,7 +174,7 @@ def build_timeline_for_alert(alert_id: str) -> dict[str, Any]:
         )
 
     # pivot log listede yoksa ekle
-    if pivot_log and not any(str(l.get("id")) == str(pivot_log.get("id")) for l in related_logs):
+    if pivot_log and not any(str(item.get("id")) == str(pivot_log.get("id")) for item in related_logs):
         related_logs.append(pivot_log)
 
     events = [

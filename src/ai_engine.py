@@ -10,12 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import config
-from cursor_sdk import Agent, AgentOptions, CursorAgentError, LocalAgentOptions
 
 from src.database import (
     get_alert_by_log_id,
     get_log_by_id,
-    get_logs,
     get_rule_for_log,
     get_unprocessed_logs,
     insert_rule,
@@ -197,6 +195,11 @@ def resolve_analysis_mode() -> str:
     return mode
 
 
+def _kql_str(value: str) -> str:
+    """KQL string literal içine güvenle gömmek için ters eğik çizgi ve tırnakları kaçır."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def analyze_log_heuristic(log: dict[str, Any]) -> ThreatAnalysis:
     """Rule-based fallback when Cursor API key is unavailable."""
     log_id = log.get("id", "unknown")
@@ -247,7 +250,7 @@ def analyze_log_heuristic(log: dict[str, Any]) -> ThreatAnalysis:
     kql_query = f"""SecurityEvent
 | where TimeGenerated > ago(24h)
 | where EventID in (4688, 4624, 4625, 4648)
-| where Computer has "{hostname}" or Account has "{username}"
+| where Computer has "{_kql_str(hostname)}" or Account has "{_kql_str(username)}"
 | where Process has "{keyword}" or CommandLine has "{keyword}"
 | project TimeGenerated, Computer, Account, EventID, Process, CommandLine
 | order by TimeGenerated desc"""
@@ -293,7 +296,7 @@ def analyze_log(
 
     try:
         return analyze_log_with_llm(log, api_key=api_key, model=model)
-    except (RuntimeError, CursorAgentError, OSError) as exc:
+    except (RuntimeError, ImportError, OSError) as exc:
         _llm_disabled = True
         logger.warning("Cursor LLM unavailable (%s); using heuristic fallback", exc)
         return analyze_log_heuristic(log)
@@ -315,6 +318,9 @@ def analyze_log_with_llm(
 
     log_id = log.get("id", "unknown")
     logger.info("Starting LLM analysis for log %s", log_id)
+
+    # cursor-sdk yalnızca LLM modu için gerekli; heuristic modda yüklü olması şart değil.
+    from cursor_sdk import Agent, AgentOptions, CursorAgentError, LocalAgentOptions
 
     prompt = build_analysis_prompt(log)
     project_root = str(Path(config.BASE_DIR))

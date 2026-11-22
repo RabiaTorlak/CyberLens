@@ -1,6 +1,8 @@
 supabase>=2.0.0
 python-dotenv>=1.0.0
+httpx>=0.25.0
 psycopg2-binary>=2.9.0
+# Opsiyonel: yalnızca AI_ANALYSIS_MODE=cursor / auto + CURSOR_API_KEY için
 cursor-sdk>=0.1.0
 streamlit>=1.33.0
 plotly>=5.18.0

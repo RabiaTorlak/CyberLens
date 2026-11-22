@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from datetime import datetime, timezone
 from typing import Any
 
@@ -34,31 +35,45 @@ PLAYBOOK_BY_EVENT: dict[str, list[str]] = {
 DEFAULT_PLAYBOOK = ["notify_soc", "isolate_host"]
 
 
-def _extract_ip(log: dict[str, Any]) -> str:
+def _raw_dict(log: dict[str, Any]) -> dict[str, Any]:
     raw = log.get("raw_data") or {}
-    if not isinstance(raw, dict):
-        return "0.0.0.0"
+    return raw if isinstance(raw, dict) else {}
+
+
+def _extract_ip(log: dict[str, Any]) -> str | None:
+    """Logdaki ilk geçerli IP adresini döndür; yoksa None (sahte IP üretilmez)."""
+    raw = _raw_dict(log)
     for key in ("destination", "c2_host", "remote_ip", "src_ip", "ip"):
         value = raw.get(key)
-        if value:
-            return str(value).split("/")[0].strip()
-    return "185.220.101.45"
+        if not value:
+            continue
+        candidate = str(value).split("/")[0].split(":")[0].strip()
+        try:
+            ipaddress.ip_address(candidate)
+        except ValueError:
+            continue
+        return candidate
+    return None
 
 
 def _build_action_detail(action: str, log: dict[str, Any]) -> str:
     hostname = log.get("hostname") or "unknown-host"
     username = log.get("username") or "unknown-user"
-    ip = _extract_ip(log)
 
     if action == "block_ip":
+        ip = _extract_ip(log)
+        if ip is None:
+            return "IP engelleme atlandı: logda geçerli IP adresi yok"
         return f"{ACTION_LABELS_TR[action]}: {ip}"
     if action == "isolate_host":
         return f"{ACTION_LABELS_TR[action]}: {hostname}"
     if action == "disable_user":
         return f"{ACTION_LABELS_TR[action]}: {username}"
     if action == "quarantine_process":
-        raw = log.get("raw_data") or {}
-        process = raw.get("process") or raw.get("command") or raw.get("tool") or "suspicious.exe"
+        raw = _raw_dict(log)
+        process = raw.get("process") or raw.get("command") or raw.get("tool")
+        if not process:
+            return "Process karantinası atlandı: logda process bilgisi yok"
         return f"{ACTION_LABELS_TR[action]}: {process}"
     if action == "force_password_reset":
         return f"{ACTION_LABELS_TR[action]}: {username}"

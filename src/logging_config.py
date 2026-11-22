@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
 import config
 
@@ -20,7 +19,7 @@ def setup_logging(level: str | None = None) -> None:
         return
 
     log_level = getattr(logging, (level or config.LOG_LEVEL).upper(), logging.INFO)
-    root_logger = logging.getLogger("logtut")
+    root_logger = logging.getLogger("cyberlens")
     root_logger.setLevel(log_level)
 
     formatter = logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT)
@@ -44,6 +43,6 @@ def setup_logging(level: str | None = None) -> None:
 
 def get_logger(name: str) -> logging.Logger:
     setup_logging()
-    if name.startswith("logtut."):
+    if name.startswith("cyberlens."):
         return logging.getLogger(name)
-    return logging.getLogger(f"logtut.{name}")
+    return logging.getLogger(f"cyberlens.{name}")

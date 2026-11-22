@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.ai_engine import resolve_analysis_mode
-from src.database import get_alerts, get_logs, get_rules, update_alert
+from src.database import get_alerts, get_rules, update_alert
 from src.logging_config import get_logger
 from src.realtime_listener import get_listener_mode, start_alert_listener
 from src.ui.cyber_theme import panel_title, render_alert_card
@@ -196,7 +196,7 @@ def render_metrics(logs: list, rules: list, alerts: list) -> None:
 
 def render_threat_intel_card(alerts: list[dict[str, Any]]) -> None:
     """Canlı Tehdit İstihbaratı özet kartı — tüm alarmların IoC durumunu toplar."""
-    from src.threat_intel import assess_alert, verdict_label
+    from src.threat_intel import assess_alert
 
     panel_title("🛰 CANLI TEHDİT İSTİHBARATI")
 

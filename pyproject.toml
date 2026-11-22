@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/ ve lab/ önce sys.path ayarlayıp sonra proje modüllerini import eder
+"scripts/*.py" = ["E402"]
+"lab/*.py" = ["E402"]
+# Markdown satır sonu için bilinçli olarak bırakılan sondaki boşluklar
+"src/ui/rule_explainer.py" = ["W291"]

@@ -261,7 +261,7 @@ def render_header(analysis_mode: str) -> None:
         <div class="cyber-header">
             <span class="cyber-badge cyber-badge-live">● CANLI İZLEME</span>
             <span class="cyber-badge cyber-badge-secure">TEHDİT TESPİT</span>
-            <h1>⚡ LOGTUT — GÜVENLİK İZLEME MERKEZİ</h1>
+            <h1>⚡ CYBERLENS — GÜVENLİK İZLEME MERKEZİ</h1>
             <p>
                 <span class="cyber-status-dot"></span>
                 Anlık alarm takibi · Bulut veritabanı · Mod: {mode_label}
